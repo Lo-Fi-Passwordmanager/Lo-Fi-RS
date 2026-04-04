@@ -31,7 +31,7 @@ impl Parse for UntaggedAttrs {
 }
 
 #[proc_macro_attribute]
-pub fn lofi_untagged(attr: TokenStream, mut item: TokenStream) -> TokenStream {
+pub fn lofi_autosurgeon_untagged(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     let cloned_item = item.clone();
 
     let ItemEnum {

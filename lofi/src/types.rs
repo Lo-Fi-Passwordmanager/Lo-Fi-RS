@@ -1,5 +1,5 @@
 use autosurgeon::{Hydrate, Reconcile};
-use lofi_macros::lofi_untagged;
+use lofi_macros::lofi_autosurgeon_untagged;
 
 #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
 pub struct Doc {
@@ -9,7 +9,7 @@ pub struct Doc {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[lofi_untagged(Hydrate, Reconcile)]
+#[lofi_autosurgeon_untagged(Hydrate, Reconcile)]
 pub enum Item {
     WEntry(Entry),
     WFolder(Folder),
