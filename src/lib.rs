@@ -1,34 +1,66 @@
-// use std::str::FromStr;
-// use autosurgeon::{hydrate, HydrateError};
-// use samod::{BackoffConfig, DialerHandle, DocumentId, Repo, Stopped, Url};
-// use crate::types::Doc;
-// 
-// mod types;
-// pub mod item_parser;
-// 
-// pub async fn lib() {
-//     let repo: Repo = Repo::builder(tokio::runtime::Handle::current())
-//         .with_storage(samod::storage::TokioFilesystemStorage::new("./data"))
-//         .with_announce_policy(|_doc_id, _peer_id| false)
-//         .load()
-//         .await;
-// 
-//     let ws_url = Url::parse(&"wss://5bcaaf94-60ef-4757-b55c-5f2e443c480c.ka.bw-cloud-instance.org/".to_string())
-//         .expect("valid WebSocket listener URL for samod");
-//     let repo_dailer = repo.dial_websocket(ws_url, BackoffConfig::default());
-// 
-//     match repo_dailer {
-//         Ok(_) => {
-//             let doc_id = DocumentId::from_str("3J14FKnxJStfFycHKszg2xdv5hRy").unwrap();
-//             let handle = repo.find(doc_id).await.unwrap().unwrap();
-//             handle.with_document(|automerge_doc| -> () {
-//                 let doc: Doc = hydrate(automerge_doc).unwrap();
-// 
-//                 println!("{:?}", doc)
-//             })
-//         }
-//         Err(_) => {
-//             todo!()
-//         }
-//     }
-// }
+use std::time::Duration;
+use autosurgeon::{hydrate};
+use samod::{BackoffConfig, DialerHandle, DocHandle, DocumentId, Repo, Url};
+use tokio::time::sleep;
+use crate::types::Doc;
+use anyhow::{Result};
+
+mod types;
+pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
+    tracing::debug!("Initializing automerge-repo");
+
+    let repo: Repo = Repo::build_tokio()
+        .with_storage(samod::storage::TokioFilesystemStorage::new("./data"))
+        .load()
+        .await;
+
+
+    tracing::debug!("Connecting to sync server");
+
+    let repo_dialer = repo.dial_websocket(websocket_url, BackoffConfig::default());
+
+    match repo_dialer {
+        Ok(dailer_handle) => {
+            tracing::debug!("WebSocket connected");
+            Ok((repo, dailer_handle))
+        }
+        Err(e) => {
+            tracing::debug!("Failed to connect to WebSocket server");
+            Err(anyhow::anyhow!("Failed to connect to WebSocket server: {:?}", e))
+        }
+    }
+}
+
+pub async fn openDocument(repo: Repo, _dialer_handle: DialerHandle, doc_id: DocumentId) -> Result<DocHandle> {
+
+    tracing::debug!("Looking for document...");
+    let doc_handle = repo.find(doc_id.clone()).await?;
+
+    // if doc_handle.is_none() {
+    //     tracing::debug!("Document not immediately available, waiting for sync...");
+    //
+    //     // Try again after sync
+    //     doc_handle = repo.find(doc_id).await?;
+    // } else {
+    //     tracing::debug!("Document found, waiting for full sync...");
+    // }
+
+    match doc_handle {
+        None => Err(anyhow::anyhow!("Document not found. Make sure:\n  1. The sync server is running\n  2. The document exists in the browser\n  3. The document ID is correct")),
+        Some(handle) => {
+            Ok(handle)
+        }
+    }
+}
+
+pub async fn getDocData(doc_handle: DocHandle) -> Result<Doc> {
+    doc_handle.with_document(|doc| {
+        match hydrate(doc) {
+            Ok(data) => Ok(data),
+            Err(e) => {
+                tracing::error!("Failed to hydrate document: {:?}", e);
+                Err(anyhow::anyhow!("Failed to hydrate document: {:?}", e))
+            }
+        }
+    })
+}

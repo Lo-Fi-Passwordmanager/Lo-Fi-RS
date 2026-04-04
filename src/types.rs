@@ -1,6 +1,4 @@
-use crate::hydrate::Unexpected::Text;
 use std::collections::HashMap;
-use std::iter::Map;
 use automerge::iter::MapRangeItem;
 use automerge::ObjType;
 use autosurgeon::{Hydrate, HydrateError, Prop, ReadDoc, Reconcile, Reconciler};

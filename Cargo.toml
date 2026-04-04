@@ -3,6 +3,14 @@ name = "lofi"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "mylib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lofi-cli"
+path = "src/main.rs"
+
 [dependencies]
 automerge = "0.8.0"
 autosurgeon = "0.11.0"
