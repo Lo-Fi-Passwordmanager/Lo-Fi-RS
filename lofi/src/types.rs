@@ -1,19 +1,19 @@
-use std::collections::HashMap;
 use automerge::iter::MapRangeItem;
 use automerge::ObjType;
-use autosurgeon::{Hydrate, HydrateError, Prop, ReadDoc, Reconcile, Reconciler};
+use autosurgeon::{Hydrate, HydrateError, ReadDoc, Reconcile, Reconciler};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
 pub struct Doc {
     salt: autosurgeon::Text,
     validation: autosurgeon::Text,
-    items: Vec<Item>
+    items: Vec<Item>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     WEntry(Entry),
-    WFolder(Folder)
+    WFolder(Folder),
 }
 
 impl Reconcile for Item {
@@ -21,15 +21,14 @@ impl Reconcile for Item {
 
     fn reconcile<R: Reconciler>(&self, reconciler: R) -> Result<(), R::Error> {
         match self {
-            Item::WEntry(entry) => {entry.reconcile(reconciler)}
-            Item::WFolder(folder) => {folder.reconcile(reconciler)}
+            Item::WEntry(entry) => entry.reconcile(reconciler),
+            Item::WFolder(folder) => folder.reconcile(reconciler),
         }
     }
 }
 
 impl Hydrate for Item {
     fn hydrate_map<D: ReadDoc>(doc: &D, obj: &automerge::ObjId) -> Result<Self, HydrateError> {
-
         let Some(obj_type) = doc.object_type(obj) else {
             return Err(HydrateError::unexpected(
                 "an item",
@@ -40,24 +39,26 @@ impl Hydrate for Item {
         match obj_type {
             ObjType::Map | ObjType::Table => {
                 let entries: HashMap<String, MapRangeItem> = doc
-                .map_range(obj.clone(), ..).map(move |item| {
-                    let key = item.key.as_ref();
-                    (key.to_string(), item)
-                }).collect();
+                    .map_range(obj.clone(), ..)
+                    .map(move |item| {
+                        let key = item.key.as_ref();
+                        (key.to_string(), item)
+                    })
+                    .collect();
 
                 let t = entries.get("type").unwrap();
 
                 let val = autosurgeon::Text::hydrate(doc, obj, t.key.as_ref().into())?;
 
                 match val.as_str() {
-                    "entry" => { Ok(Item::WEntry(Entry::hydrate_map(doc, obj)?)) }
-                    "folder" => { Ok(Item::WFolder(Folder::hydrate_map(doc, obj)?)) }
+                    "entry" => Ok(Item::WEntry(Entry::hydrate_map(doc, obj)?)),
+                    "folder" => Ok(Item::WFolder(Folder::hydrate_map(doc, obj)?)),
                     _ => Err(HydrateError::unexpected(
                         "an item",
                         format!("a/an {}", val.as_str()).to_string(),
-                    ))
+                    )),
                 }
-            },
+            }
             ObjType::Text => Err(HydrateError::unexpected(
                 "an item",
                 "a text object".to_string(),
