@@ -2,8 +2,6 @@ use crate::types::Doc;
 use anyhow::Result;
 use autosurgeon::hydrate;
 use samod::{BackoffConfig, DialerHandle, DocHandle, DocumentId, Repo, Url};
-use std::time::Duration;
-use tokio::time::sleep;
 
 mod types;
 pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {

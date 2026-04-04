@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use syn::__private::quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, ItemEnum, Type, Variant};
+use syn::{parse_macro_input, ItemEnum, Variant};
 
 struct UntaggedAttrs {
     hydrate: bool,
@@ -31,49 +31,59 @@ impl Parse for UntaggedAttrs {
 }
 
 #[proc_macro_attribute]
-pub fn samod_untagged(attr: TokenStream, mut item: TokenStream) -> TokenStream {
+pub fn lofi_untagged(attr: TokenStream, mut item: TokenStream) -> TokenStream {
     let cloned_item = item.clone();
 
     let ItemEnum {
-        attrs,
-        vis,
-        enum_token,
+        attrs: _,
+        vis: _,
+        enum_token: _,
         ident,
-        generics,
-        brace_token,
+        generics: _,
+        brace_token: _,
         variants,
     } = parse_macro_input!(cloned_item as ItemEnum);
 
     let UntaggedAttrs { hydrate, reconcile } = parse_macro_input!(attr as UntaggedAttrs);
-
-    let str_ident = ident.to_string();
     let vars: Vec<&Variant> = variants.iter().collect();
 
-    let hydrate_vars: Vec<String> = vars
+    let hydrate_vars: Vec<proc_macro2::TokenStream> = vars
         .iter()
         .map(|v| {
-            let variant = v.ident.to_string();
-            let f = v.fields.iter().next().unwrap();
-            let inner_variant = match &f.ty {
-                Type::Path(path) => path.path.segments[0].ident.to_string(),
-                _ => "".to_string(),
+            let variant_ident = &v.ident;
+
+            let f = v
+                .fields
+                .iter()
+                .next()
+                .expect("Variant must have at least one field");
+
+            let inner_type = match &f.ty {
+                syn::Type::Path(path) => &path.path.segments[0].ident,
+                _ => panic!("Expected a type path for variant {}", variant_ident),
             };
-            let lower_inner_variant = inner_variant.to_lowercase();
-            format!("\"{lower_inner_variant}\" => Ok({str_ident}::{variant}({inner_variant}::hydrate_map(doc, obj)?)),")
+
+            let pattern_str = inner_type.to_string().to_lowercase();
+
+            quote! {
+                #pattern_str => Ok(#ident::#variant_ident(#inner_type::hydrate_map(doc, obj)?)),
+            }
         })
         .collect();
 
-    let reconcile_vars: Vec<String> = vars
+    let reconcile_vars: Vec<proc_macro2::TokenStream> = vars
         .iter()
         .map(|v| {
-            let variant = v.ident.to_string();
-            format!("{str_ident}::{variant}(item) => item.reconcile(reconciler),")
+            let variant = &v.ident;
+            quote! {
+                #ident::#variant(item) => item.reconcile(reconciler),
+            }
         })
         .collect();
 
     if reconcile {
         <proc_macro::TokenStream as Extend<proc_macro::TokenTree>>::extend::<proc_macro::TokenStream>(&mut item, quote! {
-            impl autosurgeon::Reconcile for #str_ident {
+            impl autosurgeon::Reconcile for #ident {
                 type Key<'a> = ();
 
                 fn reconcile<R: autosurgeon::Reconciler>(&self, reconciler: R) -> Result<(), R::Error> {
@@ -87,7 +97,7 @@ pub fn samod_untagged(attr: TokenStream, mut item: TokenStream) -> TokenStream {
 
     if hydrate {
         <proc_macro::TokenStream as Extend<proc_macro::TokenTree>>::extend::<proc_macro::TokenStream>(&mut item, quote! {
-            impl autosurgeon::Hydrate for #str_ident {
+            impl autosurgeon::Hydrate for #ident {
                 fn hydrate_map<D: autosurgeon::ReadDoc>(doc: &D, obj: &automerge::ObjId) -> Result<Self, autosurgeon::HydrateError> {
                     let Some(obj_type) = doc.object_type(obj) else {
                         return Err(autosurgeon::HydrateError::unexpected(
@@ -118,11 +128,11 @@ pub fn samod_untagged(attr: TokenStream, mut item: TokenStream) -> TokenStream {
                                 )),
                             }
                         }
-                        automerge::ObjType::Text => Err(HydrateError::unexpected(
+                        automerge::ObjType::Text => Err(autosurgeon::HydrateError::unexpected(
                             "an item",
                             "a text object".to_string(),
                         )),
-                        automerge::ObjType::List => Err(HydrateError::unexpected(
+                        automerge::ObjType::List => Err(autosurgeon::HydrateError::unexpected(
                             "an item",
                             "a list object".to_string(),
                         )),

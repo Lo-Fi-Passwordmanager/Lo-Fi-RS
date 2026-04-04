@@ -10,3 +10,4 @@ proc-macro = true
 [dependencies]
 regex = "1.12.3"
 syn = { version = "2.0.117", features = ["full", "extra-traits"] }
+proc-macro2 = "1.0.106"
