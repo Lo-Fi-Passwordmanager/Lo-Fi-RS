@@ -49,30 +49,14 @@ impl Hydrate for Item {
 
                 let t = entries.get("type").unwrap();
 
-                let val = String::hydrate(doc, obj, t.key.as_ref().into())?;
+                let val = autosurgeon::Text::hydrate(doc, obj, t.key.as_ref().into())?;
 
                 match val.as_str() {
-                    "entry" => { Ok(Item::WEntry(Entry {
-                        entry_type: autosurgeon::Text::with_value(val),
-                        name: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("name").unwrap().key.as_ref().into())?),
-                        created_at: u32::hydrate(doc, obj, entries.get("createdAt").unwrap().key.as_ref().into())?,
-                        edited_at: u32::hydrate(doc, obj, entries.get("editedAt").unwrap().key.as_ref().into())?,
-                        parent_id: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("parentId").unwrap().key.as_ref().into())?),
-                        username: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("username").unwrap().key.as_ref().into())?),
-                        password: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("password").unwrap().key.as_ref().into())?),
-                        url: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("url").unwrap().key.as_ref().into())?),
-                        note: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("note").unwrap().key.as_ref().into())?),
-                    })) }
-                    "folder" => { Ok(Item::WFolder(Folder {
-                        entry_type: autosurgeon::Text::with_value(val),
-                        name: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("name").unwrap().key.as_ref().into())?),
-                        created_at: u32::hydrate(doc, obj, entries.get("createdAt").unwrap().key.as_ref().into())?,
-                        edited_at: u32::hydrate(doc, obj, entries.get("editedAt").unwrap().key.as_ref().into())?,
-                        parent_id: autosurgeon::Text::with_value(String::hydrate(doc, obj, entries.get("parentId").unwrap().key.as_ref().into())?),
-                    })) }
+                    "entry" => { Ok(Item::WEntry(Entry::hydrate_map(doc, obj)?)) }
+                    "folder" => { Ok(Item::WFolder(Folder::hydrate_map(doc, obj)?)) }
                     _ => Err(HydrateError::unexpected(
                         "an item",
-                        "a text object".to_string(),
+                        format!("a/an {}", val.as_str()).to_string(),
                     ))
                 }
             },
@@ -88,15 +72,15 @@ impl Hydrate for Item {
     }
 }
 
-#[derive(Debug, Clone, Reconcile, Hydrate, PartialEq)]
+#[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
 pub struct Entry {
     #[autosurgeon(rename = "type")]
     entry_type: autosurgeon::Text,
     name: autosurgeon::Text,
     #[autosurgeon(rename = "createdAt")]
-    created_at: u32,
+    created_at: f64,
     #[autosurgeon(rename = "editedAt")]
-    edited_at: u32,
+    edited_at: f64,
     #[autosurgeon(rename = "parentId")]
     parent_id: autosurgeon::Text,
     username: autosurgeon::Text,
@@ -105,15 +89,15 @@ pub struct Entry {
     note: autosurgeon::Text,
 }
 
-#[derive(Debug, Clone, Reconcile, Hydrate, PartialEq)]
+#[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
 pub struct Folder {
     #[autosurgeon(rename = "type")]
     entry_type: autosurgeon::Text,
     name: autosurgeon::Text,
     #[autosurgeon(rename = "createdAt")]
-    created_at: u32,
+    created_at: f64,
     #[autosurgeon(rename = "editedAt")]
-    edited_at: u32,
+    edited_at: f64,
     #[autosurgeon(rename = "parentId")]
     parent_id: autosurgeon::Text,
 }
