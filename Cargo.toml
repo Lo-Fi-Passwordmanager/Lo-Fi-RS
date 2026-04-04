@@ -1,2 +1,3 @@
 [workspace]
 members = ["lofi", "lofi-macros"]
+resolver = "3"

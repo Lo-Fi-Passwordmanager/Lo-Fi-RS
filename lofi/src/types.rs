@@ -1,102 +1,46 @@
-use automerge::iter::MapRangeItem;
-use automerge::ObjType;
-use autosurgeon::{Hydrate, HydrateError, ReadDoc, Reconcile, Reconciler};
-use std::collections::HashMap;
+use autosurgeon::{Hydrate, Reconcile, Reconciler};
+use lofi_macros::samod_untagged;
 
-#[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
-pub struct Doc {
-    salt: autosurgeon::Text,
-    validation: autosurgeon::Text,
-    items: Vec<Item>,
-}
+// #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
+// pub struct Doc {
+//     salt: autosurgeon::Text,
+//     validation: autosurgeon::Text,
+//     items: Vec<Item>,
+// }
 
-#[derive(Debug, Clone, PartialEq)]
+// #[derive(Debug, Clone, PartialEq)]
+#[samod_untagged(Hydrate, Reconcile)]
 pub enum Item {
     WEntry(Entry),
     WFolder(Folder),
 }
 
-impl Reconcile for Item {
-    type Key<'a> = ();
-
-    fn reconcile<R: Reconciler>(&self, reconciler: R) -> Result<(), R::Error> {
-        match self {
-            Item::WEntry(entry) => entry.reconcile(reconciler),
-            Item::WFolder(folder) => folder.reconcile(reconciler),
-        }
-    }
-}
-
-impl Hydrate for Item {
-    fn hydrate_map<D: ReadDoc>(doc: &D, obj: &automerge::ObjId) -> Result<Self, HydrateError> {
-        let Some(obj_type) = doc.object_type(obj) else {
-            return Err(HydrateError::unexpected(
-                "an item",
-                "a scalar value".to_string(),
-            ));
-        };
-
-        match obj_type {
-            ObjType::Map | ObjType::Table => {
-                let entries: HashMap<String, MapRangeItem> = doc
-                    .map_range(obj.clone(), ..)
-                    .map(move |item| {
-                        let key = item.key.as_ref();
-                        (key.to_string(), item)
-                    })
-                    .collect();
-
-                let t = entries.get("type").unwrap();
-
-                let val = autosurgeon::Text::hydrate(doc, obj, t.key.as_ref().into())?;
-
-                match val.as_str() {
-                    "entry" => Ok(Item::WEntry(Entry::hydrate_map(doc, obj)?)),
-                    "folder" => Ok(Item::WFolder(Folder::hydrate_map(doc, obj)?)),
-                    _ => Err(HydrateError::unexpected(
-                        "an item",
-                        format!("a/an {}", val.as_str()).to_string(),
-                    )),
-                }
-            }
-            ObjType::Text => Err(HydrateError::unexpected(
-                "an item",
-                "a text object".to_string(),
-            )),
-            ObjType::List => Err(HydrateError::unexpected(
-                "an item",
-                "a list object".to_string(),
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
-pub struct Entry {
-    #[autosurgeon(rename = "type")]
-    entry_type: autosurgeon::Text,
-    name: autosurgeon::Text,
-    #[autosurgeon(rename = "createdAt")]
-    created_at: f64,
-    #[autosurgeon(rename = "editedAt")]
-    edited_at: f64,
-    #[autosurgeon(rename = "parentId")]
-    parent_id: autosurgeon::Text,
-    username: autosurgeon::Text,
-    password: autosurgeon::Text,
-    url: autosurgeon::Text,
-    note: autosurgeon::Text,
-}
-
-#[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
-pub struct Folder {
-    #[autosurgeon(rename = "type")]
-    entry_type: autosurgeon::Text,
-    name: autosurgeon::Text,
-    #[autosurgeon(rename = "createdAt")]
-    created_at: f64,
-    #[autosurgeon(rename = "editedAt")]
-    edited_at: f64,
-    #[autosurgeon(rename = "parentId")]
-    parent_id: autosurgeon::Text,
-}
+// #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
+// pub struct Entry {
+//     #[autosurgeon(rename = "type")]
+//     entry_type: autosurgeon::Text,
+//     name: autosurgeon::Text,
+//     #[autosurgeon(rename = "createdAt")]
+//     created_at: f64,
+//     #[autosurgeon(rename = "editedAt")]
+//     edited_at: f64,
+//     #[autosurgeon(rename = "parentId")]
+//     parent_id: autosurgeon::Text,
+//     username: autosurgeon::Text,
+//     password: autosurgeon::Text,
+//     url: autosurgeon::Text,
+//     note: autosurgeon::Text,
+// }
+//
+// #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
+// pub struct Folder {
+//     #[autosurgeon(rename = "type")]
+//     entry_type: autosurgeon::Text,
+//     name: autosurgeon::Text,
+//     #[autosurgeon(rename = "createdAt")]
+//     created_at: f64,
+//     #[autosurgeon(rename = "editedAt")]
+//     edited_at: f64,
+//     #[autosurgeon(rename = "parentId")]
+//     parent_id: autosurgeon::Text,
+// }

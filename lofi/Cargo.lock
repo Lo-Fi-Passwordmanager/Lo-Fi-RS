@@ -966,10 +966,18 @@ dependencies = [
  "anyhow",
  "automerge",
  "autosurgeon",
+ "lofi-macros",
  "samod",
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "lofi-macros"
+version = "0.1.0"
+dependencies = [
+ "syn",
 ]
 
 [[package]]
