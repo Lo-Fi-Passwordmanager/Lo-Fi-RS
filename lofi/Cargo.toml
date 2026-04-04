@@ -1,0 +1,22 @@
+[package]
+name = "lofi"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "lofi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lofi-cli"
+path = "src/main.rs"
+
+[dependencies]
+automerge = "0.8.0"
+autosurgeon = "0.11.0"
+samod = { features = ["tokio", "axum", "tungstenite"], version = "0.9.0" }
+tokio = { version = "1.40.0", features = ["full"] }
+tracing-subscriber = "0.3.23"
+tracing = "0.1.44"
+anyhow = "1.0.102"
