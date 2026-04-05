@@ -21,4 +21,5 @@ tracing-subscriber = "0.3.23"
 tracing = "0.1.44"
 anyhow = "1.0.102"
 lofi-macros = { path = "../lofi-macros" }
-syn = "2.0.117"
+aes-gcm-siv = "0.11.1"
+scrypt = "0.11.0"

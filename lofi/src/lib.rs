@@ -3,7 +3,9 @@ use anyhow::Result;
 use autosurgeon::hydrate;
 use samod::{BackoffConfig, DialerHandle, DocHandle, DocumentId, Repo, Url};
 
-mod types;
+pub mod security;
+pub mod types;
+
 pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
     tracing::debug!("Initializing automerge-repo");
 
@@ -12,17 +14,17 @@ pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
         .load()
         .await;
 
-    tracing::debug!("Connecting to sync server");
+    tracing::debug!("Connecting to sync server...");
 
     let repo_dialer = repo.dial_websocket(websocket_url, BackoffConfig::default());
 
     match repo_dialer {
         Ok(dailer_handle) => {
-            tracing::debug!("WebSocket connected");
+            tracing::debug!("WebSocket connected.");
             Ok((repo, dailer_handle))
         }
         Err(e) => {
-            tracing::debug!("Failed to connect to WebSocket server");
+            tracing::error!("Failed to connect to WebSocket server");
             Err(anyhow::anyhow!(
                 "Failed to connect to WebSocket server: {:?}",
                 e
@@ -39,20 +41,17 @@ pub async fn openDocument(
     tracing::debug!("Looking for document...");
     let doc_handle = repo.find(doc_id.clone()).await?;
 
-    // if doc_handle.is_none() {
-    //     tracing::debug!("Document not immediately available, waiting for sync...");
-    //
-    //     // Try again after sync
-    //     doc_handle = repo.find(doc_id).await?;
-    // } else {
-    //     tracing::debug!("Document found, waiting for full sync...");
-    // }
-
     match doc_handle {
-        None => Err(anyhow::anyhow!(
-            "Document not found. Make sure:\n  1. The sync server is running\n  2. The document exists in the browser\n  3. The document ID is correct"
-        )),
-        Some(handle) => Ok(handle),
+        None => {
+            tracing::error!("Document not found.");
+            Err(anyhow::anyhow!(
+                "Document not found. Make sure:\n  1. The sync server is running\n  2. The document exists in the browser\n  3. The document ID is correct"
+            ))
+        }
+        Some(handle) => {
+            tracing::debug!("Document found.");
+            Ok(handle)
+        }
     }
 }
 

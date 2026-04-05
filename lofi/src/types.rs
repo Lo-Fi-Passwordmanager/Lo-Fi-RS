@@ -3,9 +3,9 @@ use lofi_macros::lofi_autosurgeon_untagged;
 
 #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
 pub struct Doc {
-    salt: autosurgeon::Text,
-    validation: autosurgeon::Text,
-    items: Vec<Item>,
+    pub salt: autosurgeon::Text,
+    pub validation: autosurgeon::Text,
+    pub items: Vec<Item>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -18,29 +18,29 @@ pub enum Item {
 #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
 pub struct Entry {
     #[autosurgeon(rename = "type")]
-    entry_type: autosurgeon::Text,
-    name: autosurgeon::Text,
+    pub entry_type: autosurgeon::Text,
+    pub name: autosurgeon::Text,
     #[autosurgeon(rename = "createdAt")]
-    created_at: f64,
+    pub created_at: f64,
     #[autosurgeon(rename = "editedAt")]
-    edited_at: f64,
+    pub edited_at: f64,
     #[autosurgeon(rename = "parentId")]
-    parent_id: autosurgeon::Text,
-    username: autosurgeon::Text,
-    password: autosurgeon::Text,
-    url: autosurgeon::Text,
-    note: autosurgeon::Text,
+    pub parent_id: autosurgeon::Text,
+    pub username: autosurgeon::Text,
+    pub password: autosurgeon::Text,
+    pub url: autosurgeon::Text,
+    pub note: autosurgeon::Text,
 }
 
 #[derive(Debug, Clone, Hydrate, Reconcile, PartialEq)]
 pub struct Folder {
     #[autosurgeon(rename = "type")]
-    entry_type: autosurgeon::Text,
-    name: autosurgeon::Text,
+    pub entry_type: autosurgeon::Text,
+    pub name: autosurgeon::Text,
     #[autosurgeon(rename = "createdAt")]
-    created_at: f64,
+    pub created_at: f64,
     #[autosurgeon(rename = "editedAt")]
-    edited_at: f64,
+    pub edited_at: f64,
     #[autosurgeon(rename = "parentId")]
-    parent_id: autosurgeon::Text,
+    pub parent_id: autosurgeon::Text,
 }
