@@ -32,6 +32,18 @@ impl Parse for UntaggedAttrs {
 
 #[proc_macro_attribute]
 pub fn lofi_autosurgeon_untagged(attr: TokenStream, mut item: TokenStream) -> TokenStream {
+    let identifier_item = item.clone();
+    let identifier_item2 = item.clone();
+
+    if syn::parse::<ItemEnum>(identifier_item).is_err() {
+        return syn::Error::new_spanned(
+            proc_macro2::TokenStream::from(identifier_item2),
+            "Error: Attribute lofi_autosurgeon_untagged is only works with enums",
+        )
+        .to_compile_error()
+        .into();
+    }
+
     let cloned_item = item.clone();
 
     let ItemEnum {
@@ -50,7 +62,7 @@ pub fn lofi_autosurgeon_untagged(attr: TokenStream, mut item: TokenStream) -> To
     let hydrate_vars: Vec<proc_macro2::TokenStream> = vars
         .iter()
         .map(|v| {
-            let variant_ident = &v.ident;
+            let variant = &v.ident;
 
             let f = v
                 .fields
@@ -60,13 +72,14 @@ pub fn lofi_autosurgeon_untagged(attr: TokenStream, mut item: TokenStream) -> To
 
             let inner_type = match &f.ty {
                 syn::Type::Path(path) => &path.path.segments[0].ident,
-                _ => panic!("Expected a type path for variant {}", variant_ident),
+                _ => panic!("Expected a type path for variant {}", variant),
             };
 
-            let pattern_str = inner_type.to_string().to_lowercase();
-
             quote! {
-                #pattern_str => Ok(#ident::#variant_ident(#inner_type::hydrate_map(doc, obj)?)),
+                let result = #inner_type::hydrate_map(doc, obj);
+                if result.is_ok() {
+                    return Ok(#ident::#variant(result?))
+                }
             }
         })
         .collect();
@@ -83,6 +96,7 @@ pub fn lofi_autosurgeon_untagged(attr: TokenStream, mut item: TokenStream) -> To
 
     if reconcile {
         <proc_macro::TokenStream as Extend<proc_macro::TokenTree>>::extend::<proc_macro::TokenStream>(&mut item, quote! {
+            #[automatically_derived]
             impl autosurgeon::Reconcile for #ident {
                 type Key<'a> = ();
 
@@ -97,43 +111,41 @@ pub fn lofi_autosurgeon_untagged(attr: TokenStream, mut item: TokenStream) -> To
 
     if hydrate {
         <proc_macro::TokenStream as Extend<proc_macro::TokenTree>>::extend::<proc_macro::TokenStream>(&mut item, quote! {
+            #[automatically_derived]
             impl autosurgeon::Hydrate for #ident {
                 fn hydrate_map<D: autosurgeon::ReadDoc>(doc: &D, obj: &automerge::ObjId) -> Result<Self, autosurgeon::HydrateError> {
                     let Some(obj_type) = doc.object_type(obj) else {
                         return Err(autosurgeon::HydrateError::unexpected(
-                            "an item",
+                            "a value matching to any of the members of #ident",
                             "a scalar value".to_string(),
                         ));
                     };
 
                     match obj_type {
                         automerge::ObjType::Map | automerge::ObjType::Table => {
-                            let entries: std::collections::HashMap<String, automerge::iter::MapRangeItem> = doc
+                            let entries: Vec<String> = doc
                                 .map_range(obj.clone(), ..)
-                                .map(move |item| {
-                                    let key = item.key.as_ref();
-                                    (key.to_string(), item)
+                                .map(|item| {
+                                    item.key.to_string()
                                 })
                                 .collect();
 
-                            let t = entries.get("type").unwrap();
+                            #(#hydrate_vars)*
 
-                            let val = autosurgeon::Text::hydrate(doc, obj, t.key.as_ref().into())?;
-
-                            match val.as_str() {
-                                #(#hydrate_vars)*
-                                _ => Err(autosurgeon::HydrateError::unexpected(
-                                    "an item",
-                                    format!("a/an {}", val.as_str()).to_string(),
-                                )),
-                            }
+                            Err(autosurgeon::HydrateError::unexpected(
+                                "a value matching to any of the members of #ident",
+                                format!(
+                                    "a structure with the following fields: {:?}",
+                                    entries
+                                ),
+                            ))
                         }
                         automerge::ObjType::Text => Err(autosurgeon::HydrateError::unexpected(
-                            "an item",
+                            "a value matching to any of the members of #ident",
                             "a text object".to_string(),
                         )),
                         automerge::ObjType::List => Err(autosurgeon::HydrateError::unexpected(
-                            "an item",
+                            "a value matching to any of the members of #ident",
                             "a list object".to_string(),
                         )),
                     }

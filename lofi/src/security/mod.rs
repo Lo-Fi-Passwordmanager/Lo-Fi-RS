@@ -1,2 +1,3 @@
 pub mod crypter;
-pub mod keygen;
+mod keygen;
+pub mod utils;

@@ -94,9 +94,9 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "automerge"
-version = "0.8.0"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2aab56635599ee2e9df28d9ce180c155b8dbcdd96e4c3f62895fc6a44137d328"
+checksum = "3f4f9b5e81602f033fac828dafb4fef91742f6f01adfdb8ee5b8bc804cfac7bb"
 dependencies = [
  "cfg-if",
  "flate2",
@@ -110,34 +110,35 @@ dependencies = [
  "serde",
  "sha2 0.11.0",
  "smol_str",
- "thiserror 2.0.18",
+ "thiserror",
  "tinyvec",
  "tracing",
  "unicode-segmentation",
 ]
 
 [[package]]
-name = "autosurgeon"
-version = "0.11.0"
+name = "automorph"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baa6f26cb5312c04e444a06ff0ef5f2a102ec197db106a76dabdcac1bc8c5549"
+checksum = "42f6b6fdc8f834c0db4bfacf5cfddc2214d3d69c59a061f401560127267d448d"
 dependencies = [
+ "anyhow",
  "automerge",
- "autosurgeon-derive",
- "similar",
- "thiserror 1.0.69",
+ "automorph-derive",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
-name = "autosurgeon-derive"
-version = "0.11.0"
+name = "automorph-derive"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b970eac48c83d4134f890aa34c3d1ade419f471d5e22ac798734f549722b32b"
+checksum = "dbff42813427976d419e0a81d7da3618f84ccd5cd6f974991abcab8388b5294a"
 dependencies = [
+ "automerge",
  "proc-macro2",
  "quote",
  "syn",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -255,17 +256,6 @@ checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
 dependencies = [
  "sha2 0.10.9",
  "tinyvec",
-]
-
-[[package]]
-name = "bstr"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
-dependencies = [
- "memchr",
- "regex-automata",
- "serde",
 ]
 
 [[package]]
@@ -721,12 +711,12 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hexane"
-version = "0.2.1"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f4ecba0bb4e14df997df7cab6d1b584c6432d8865cf2adfced814706d715a7b"
+checksum = "8ab946df174dbf65fc07610c1f936b3e40b9ca7cfd09c0f827f9509a62e93a39"
 dependencies = [
  "leb128",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -1058,10 +1048,11 @@ dependencies = [
  "aes-gcm-siv",
  "anyhow",
  "automerge",
- "autosurgeon",
- "lofi-macros",
+ "automorph",
+ "futures-util",
  "samod",
  "scrypt",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1484,9 +1475,9 @@ dependencies = [
 
 [[package]]
 name = "samod"
-version = "0.9.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcbb3956dcbfc9d3530c3c9ee32e5cf97d37617bb3e558ab06921b39248eee55"
+checksum = "0c271f2adac0d3c142dda57a5ee27ef4f215f6feb953fed971d1e37086da866d"
 dependencies = [
  "async-channel",
  "automerge",
@@ -1508,9 +1499,9 @@ dependencies = [
 
 [[package]]
 name = "samod-core"
-version = "0.9.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e290dcf4c69512978d4ae37d51c9e599f0711ec1f996547342521c697705053"
+checksum = "0bcadafa97af67eebbd685cf6d73ba3b5523e5b5921fe63c7d097859bb980fef"
 dependencies = [
  "automerge",
  "base64 0.21.7",
@@ -1520,7 +1511,7 @@ dependencies = [
  "rand",
  "serde",
  "sha2 0.10.9",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
  "url",
  "uuid",
@@ -1713,16 +1704,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214"
 
 [[package]]
-name = "similar"
-version = "2.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
-dependencies = [
- "bstr",
- "unicode-segmentation",
-]
-
-[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1809,31 +1790,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
-dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
-name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.18",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -2062,7 +2023,7 @@ dependencies = [
  "native-tls",
  "rand",
  "sha1",
- "thiserror 2.0.18",
+ "thiserror",
  "utf-8",
 ]
 
@@ -2079,7 +2040,7 @@ dependencies = [
  "log",
  "rand",
  "sha1",
- "thiserror 2.0.18",
+ "thiserror",
  "utf-8",
 ]
 

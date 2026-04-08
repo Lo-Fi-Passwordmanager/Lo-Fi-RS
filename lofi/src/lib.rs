@@ -1,20 +1,47 @@
-use crate::types::Doc;
+use crate::document::automerge_document::{AutomergeDoc, AutomergeItems, DocUpdate};
 use anyhow::Result;
-use autosurgeon::hydrate;
+use automerge::ROOT;
+use automerge::{Automerge, PatchAction};
+use automorph::crdt::Text;
+use automorph::Automorph;
+use futures_util::StreamExt;
 use samod::{BackoffConfig, DialerHandle, DocHandle, DocumentId, Repo, Url};
+use std::num::ParseIntError;
+use std::string::ParseError;
+use thiserror::Error;
+use tokio::task::JoinHandle;
+use tracing::{debug, error};
 
+pub(crate) mod document;
 pub mod security;
-pub mod types;
+
+#[derive(Error, Debug)]
+pub enum LoFiError {
+    #[error("Invalid password for the doc you are trying to open.")]
+    InvalidPassword,
+    #[error("Something went wrong while decrypting an item: {0}")]
+    CouldNotDecrypt(String),
+    #[error("Something went wrong while encrypting an item: {0}")]
+    CouldNotEncrypt(String),
+    #[error("Something went wrong while parsing a hex string to bytes: {0}")]
+    CouldNotParse(#[from] ParseIntError),
+    #[error("Hex strings can may only have an even number of characters.")]
+    InvalidLength,
+    #[error(
+        "Invalid Scrypt parameter. This should not happen, these are hardcoded, wtf did you do."
+    )]
+    InvalidScryptParams,
+}
 
 pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
-    tracing::debug!("Initializing automerge-repo");
+    debug!("Initializing document-repo");
 
     let repo: Repo = Repo::build_tokio()
         .with_storage(samod::storage::TokioFilesystemStorage::new("./data"))
         .load()
         .await;
 
-    tracing::debug!("Connecting to sync server...");
+    debug!("Connecting to sync server...");
 
     let repo_dialer = repo.dial_websocket(websocket_url, BackoffConfig::default());
 
@@ -35,32 +62,77 @@ pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
 
 pub async fn openDocument(
     repo: Repo,
-    _dialer_handle: DialerHandle,
     doc_id: DocumentId,
-) -> Result<DocHandle> {
-    tracing::debug!("Looking for document...");
+    _change_handler: Option<&dyn Fn(Vec<DocUpdate>) -> ()>,
+) -> Result<(DocHandle, JoinHandle<()>)> {
+    debug!("Looking for document...");
     let doc_handle = repo.find(doc_id.clone()).await?;
 
     match doc_handle {
         None => {
-            tracing::error!("Document not found.");
+            error!("Document not found.");
             Err(anyhow::anyhow!(
                 "Document not found. Make sure:\n  1. The sync server is running\n  2. The document exists in the browser\n  3. The document ID is correct"
             ))
         }
         Some(handle) => {
-            tracing::debug!("Document found.");
-            Ok(handle)
+            debug!("Document found.");
+
+            let change_handle = handle.clone();
+
+            let handle_changes = async move {
+                let mut change_stream_rx = change_handle.changes();
+                let mut current_heads = change_handle.with_document(|d| d.get_heads());
+                while let Some(change) = change_stream_rx.next().await {
+                    let patches = change_handle
+                        .with_document(|d| d.diff(&*current_heads, &*change.new_heads));
+
+                    let changes: Vec<DocUpdate> = Vec::new();
+
+                    // Hier prob. nur noch einmal data.update aufrufen und die changes bekommen
+
+                    for patch in patches {
+                        match patch.action {
+                            PatchAction::PutMap { .. } => debug!("putM"),
+                            PatchAction::PutSeq { .. } => debug!("putS"),
+                            PatchAction::Insert { .. } => debug!("insert"),
+                            PatchAction::SpliceText { .. } => debug!("text"),
+                            PatchAction::Increment { .. } => todo!(),
+                            PatchAction::Conflict { .. } => todo!(),
+                            PatchAction::DeleteMap { .. } => debug!("delM"),
+                            PatchAction::DeleteSeq { .. } => debug!("delS"),
+                            PatchAction::Mark { .. } => todo!(),
+                        }
+                    }
+
+                    current_heads = change_handle.with_document(|d| d.get_heads());
+                }
+            };
+
+            let am_changes_handle = tokio::spawn(handle_changes);
+
+            Ok((handle, am_changes_handle))
         }
     }
 }
 
-pub async fn getDocData(doc_handle: DocHandle) -> Result<Doc> {
-    doc_handle.with_document(|doc| match hydrate(doc) {
-        Ok(data) => Ok(data),
-        Err(e) => {
-            tracing::error!("Failed to hydrate document: {:?}", e);
-            Err(anyhow::anyhow!("Failed to hydrate document: {:?}", e))
-        }
+pub async fn getDocData(doc_handle: DocHandle) -> Result<AutomergeDoc> {
+    // doc_handle.with_document(|doc| match Doc::load(doc, &ROOT, 0) {
+    //     Ok(data) => Ok(data),
+    //     Err(e) => {
+    //         tracing::error!("Failed to hydrate document: {:?}", e);
+    //         Err(anyhow::anyhow!("Failed to hydrate document: {:?}", e))
+    //     }
+    // })
+
+    let salt = doc_handle.with_document(|doc| Text::load(doc, &ROOT, "salt"))?;
+    let validation = doc_handle.with_document(|doc| Text::load(doc, &ROOT, "validation"))?;
+    let items = doc_handle
+        .with_document(|doc: &mut Automerge| AutomergeItems::load(doc, &ROOT, "items"))?;
+
+    Ok(AutomergeDoc {
+        salt,
+        validation,
+        items,
     })
 }

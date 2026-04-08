@@ -1,10 +1,8 @@
 use anyhow::Result;
-use lofi::security::crypter::decrypt;
-use lofi::security::keygen::derive_key;
-use lofi::types::{Doc, Item};
+use lofi::automerge_document::{Doc, Item};
+use lofi::security::crypter::Crypter;
 use lofi::{connect, getDocData, openDocument};
 use samod::{DocumentId, Url};
-use scrypt::password_hash::SaltString;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -26,27 +24,29 @@ pub async fn main() -> Result<()> {
 
     let (repo, dialer_handle) = connect(url).await?;
 
-    let doc_handle = openDocument(repo, dialer_handle, doc_id).await?;
+    let (doc_handle, am_changes_handle) = openDocument(repo, doc_id, None).await?;
 
-    let doc_data: Doc = getDocData(doc_handle).await?;
+    let doc_data = getDocData(doc_handle).await?;
 
     if doc_data.items.len() == 0 {
         println!("This document has no items.");
         return Ok(());
     }
 
-    let key = derive_key("1", SaltString::from_b64(doc_data.salt.as_str())?)?;
+    let crypter = Crypter::from_doc(doc_data, "1");
 
-    let first_item = &doc_data.items[0];
-
-    match first_item {
-        Item::WEntry(entry) => {
-            println!("{:?}", decrypt(entry.name.as_str(), key));
-        }
-        Item::WFolder(folder) => {
-            println!("{:?}", decrypt(folder.name.as_str(), key));
+    for item in &doc_data.items {
+        match item {
+            Item::WEntry(entry) => {
+                println!("Entry: {:?}", decrypt(entry.name.as_str(), key));
+            }
+            Item::WFolder(folder) => {
+                println!("Folder: {:?}", decrypt(folder.name.as_str(), key));
+            }
         }
     }
+
+    am_changes_handle.await?;
 
     Ok(())
 }

@@ -1,45 +1,65 @@
+use crate::document::automerge_document::AutomergeDoc;
+use crate::security::keygen::{derive_key, generate_nonce};
+use crate::security::utils::{bytes_to_hex, hex_to_bytes};
+use crate::LoFiError;
 use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, KeyInit, Nonce};
-use anyhow::{anyhow, Result};
-use std::fmt::Write;
 
 const SEPARATOR: &str = " ";
+const NONCE_LENGTH: usize = 12;
 
-pub fn decrypt(encrypted: &str, key: [u8; 32]) -> Result<String> {
-    tracing::debug!("Decrypting item...");
-    let enc: Vec<&str> = encrypted.split(SEPARATOR).collect();
-
-    let ddd = hexToBytes("c1bcb55f79314ceb9a4d4ef62685a0c4aa5829a2b71a1ddfffd34bdeab291e2f")?;
-
-    let ciphertext = enc[0];
-    let nonceBytes = &*hexToBytes(enc[1])?;
-    let nonce = Nonce::from_slice(nonceBytes);
-    let cipher = Aes256GcmSiv::new_from_slice(&*ddd)?;
-
-    let result = cipher
-        .decrypt(nonce, hexToBytes(ciphertext)?.as_ref())
-        .map_err(|e| anyhow!("Unable to decrypt string: {}", e))?;
-    tracing::debug!("Decrypted.");
-    Ok(String::from_utf8(result)?)
+pub struct Crypter {
+    key: [u8; 32],
 }
 
-pub fn hexToBytes(s: &str) -> Result<Vec<u8>> {
-    if s.len() % 2 != 0 {
-        Err(anyhow!(
-            "String cannot be parse to bytes because it has an odd amount of characters."
+impl Crypter {
+    pub fn from_doc(doc: AutomergeDoc, password: &str) -> Result<Self, LoFiError> {
+        let key = derive_key(password, &doc.salt)?;
+        let _ = Self::_decrypt(&key, &doc.validation).map_err(|_| LoFiError::InvalidPassword)?;
+        Ok(Self { key })
+    }
+
+    pub fn decrypt(&self, encrypted: &str) -> Result<String, LoFiError> {
+        Self::_decrypt(&self.key, encrypted)
+    }
+
+    fn _decrypt(key: &[u8; 32], encrypted: &str) -> Result<String, LoFiError> {
+        tracing::debug!("Decrypting item...");
+        let enc: Vec<&str> = encrypted.split(SEPARATOR).collect();
+
+        if enc.len() != 2 {
+            return Err(LoFiError::CouldNotDecrypt(
+                "Value has no nonce.".to_string(),
+            ));
+        }
+
+        let ciphertext = enc[0];
+        let nonce_bytes = hex_to_bytes(enc[1])?;
+        let nonce = Nonce::from_slice(&nonce_bytes);
+        let cipher = Aes256GcmSiv::new_from_slice(key)
+            .map_err(|_| LoFiError::CouldNotDecrypt("Derived key was to long.".to_string()))?;
+
+        let decrypted = cipher
+            .decrypt(nonce, hex_to_bytes(ciphertext)?.as_ref())
+            .map_err(|_| LoFiError::CouldNotDecrypt("Unable to decrypt string.".to_string()))?;
+        tracing::debug!("Decrypted.");
+        Ok(String::from_utf8(decrypted).map_err(|_| {
+            LoFiError::CouldNotDecrypt("Decrypted value is not a valid utf-8 string.".to_string())
+        })?)
+    }
+
+    pub fn encrypt(&self, plaintext: &str) -> Result<String, LoFiError> {
+        let nonce = generate_nonce();
+        let cipher = Aes256GcmSiv::new_from_slice(&self.key)
+            .map_err(|_| LoFiError::CouldNotEncrypt("Derived key was to long.".to_string()))?;
+        let encrypted = cipher
+            .encrypt(&nonce, hex_to_bytes(plaintext)?.as_ref())
+            .map_err(|_| LoFiError::CouldNotEncrypt("Unable to encrypt string.".to_string()))?;
+        Ok(format!(
+            "{}{}{}",
+            bytes_to_hex(&encrypted),
+            SEPARATOR,
+            bytes_to_hex(&nonce)
         ))
-    } else {
-        (0..s.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.into()))
-            .collect()
     }
-}
-
-pub fn encode_hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        write!(&mut s, "{:02x}", b).unwrap();
-    }
-    s
 }
