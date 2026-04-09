@@ -13,7 +13,7 @@ pub struct Crypter {
 }
 
 impl Crypter {
-    pub fn from_doc(doc: AutomergeDoc, password: &str) -> Result<Self, LoFiError> {
+    pub fn from_doc(doc: &AutomergeDoc, password: &str) -> Result<Self, LoFiError> {
         let key = derive_key(password, &doc.salt)?;
         let _ = Self::_decrypt(&key, &doc.validation).map_err(|_| LoFiError::InvalidPassword)?;
         Ok(Self { key })

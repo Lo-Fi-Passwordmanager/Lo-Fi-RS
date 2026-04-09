@@ -22,5 +22,6 @@ anyhow = "1.0.102"
 aes-gcm-siv = "0.11.1"
 scrypt = "0.11.0"
 futures-util = "0.3.32"
-automorph = "0.2.0"
+# TODO Change back to version number if/when PR #3 gets merged (https://codeberg.org/dpp/automorph/issues/2)
+automorph = { git = "https://codeberg.org/RedCommander735/automorph.git" }
 thiserror = "2.0.18"

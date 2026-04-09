@@ -1,7 +1,6 @@
 use anyhow::Result;
-use lofi::automerge_document::{Doc, Item};
-use lofi::security::crypter::Crypter;
-use lofi::{connect, getDocData, openDocument};
+use lofi::document::automerge_document::AutomergeItem;
+use lofi::{connect, get_doc_data, open_document};
 use samod::{DocumentId, Url};
 
 #[tokio::main]
@@ -24,24 +23,24 @@ pub async fn main() -> Result<()> {
 
     let (repo, dialer_handle) = connect(url).await?;
 
-    let (doc_handle, am_changes_handle) = openDocument(repo, doc_id, None).await?;
+    let (doc_handle, am_changes_handle) = open_document(repo, doc_id, None).await?;
 
-    let doc_data = getDocData(doc_handle).await?;
+    let doc_data = get_doc_data(doc_handle).await?;
 
     if doc_data.items.len() == 0 {
         println!("This document has no items.");
-        return Ok(());
+        // return Ok(());
     }
 
-    let crypter = Crypter::from_doc(doc_data, "1");
+    // let crypter = Crypter::from_doc(&doc_data, "1")?;
 
     for item in &doc_data.items {
         match item {
-            Item::WEntry(entry) => {
-                println!("Entry: {:?}", decrypt(entry.name.as_str(), key));
+            AutomergeItem::WEntry(entry) => {
+                println!("Entry: {:?}", &entry.id.to_string());
             }
-            Item::WFolder(folder) => {
-                println!("Folder: {:?}", decrypt(folder.name.as_str(), key));
+            AutomergeItem::WFolder(folder) => {
+                println!("Folder: {:?}", &folder.id.to_string());
             }
         }
     }

@@ -21,6 +21,8 @@ pub enum AutomergeItem {
 #[derive(Debug, Clone, Automorph, PartialEq)]
 #[automorph(rename_all = "camelCase")]
 pub struct AutomergeEntry {
+    #[automorph(object_id)]
+    pub id: ObjId,
     #[automorph(rename = "type")]
     pub item_type: Text,
     pub name: Text,
@@ -36,6 +38,8 @@ pub struct AutomergeEntry {
 #[derive(Debug, Clone, Automorph, PartialEq)]
 #[automorph(rename_all = "camelCase")]
 pub struct AutomergeFolder {
+    #[automorph(object_id)]
+    pub id: ObjId,
     #[automorph(rename = "type")]
     pub item_type: Text,
     pub name: Text,

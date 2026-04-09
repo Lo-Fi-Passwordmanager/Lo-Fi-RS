@@ -1,19 +1,20 @@
 use crate::document::automerge_document::{AutomergeDoc, AutomergeItems, DocUpdate};
 use anyhow::Result;
-use automerge::ROOT;
 use automerge::{Automerge, PatchAction};
+use automerge::{ROOT};
 use automorph::crdt::Text;
 use automorph::Automorph;
 use futures_util::StreamExt;
 use samod::{BackoffConfig, DialerHandle, DocHandle, DocumentId, Repo, Url};
 use std::num::ParseIntError;
-use std::string::ParseError;
 use thiserror::Error;
 use tokio::task::JoinHandle;
 use tracing::{debug, error};
 
-pub(crate) mod document;
-pub mod security;
+pub mod document;
+pub(crate) mod security;
+
+pub(crate) type LofiResult<T> = Result<T, LoFiError>;
 
 #[derive(Error, Debug)]
 pub enum LoFiError {
@@ -60,7 +61,7 @@ pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
     }
 }
 
-pub async fn openDocument(
+pub async fn open_document(
     repo: Repo,
     doc_id: DocumentId,
     _change_handler: Option<&dyn Fn(Vec<DocUpdate>) -> ()>,
@@ -116,7 +117,7 @@ pub async fn openDocument(
     }
 }
 
-pub async fn getDocData(doc_handle: DocHandle) -> Result<AutomergeDoc> {
+pub async fn get_doc_data(doc_handle: DocHandle) -> Result<AutomergeDoc> {
     // doc_handle.with_document(|doc| match Doc::load(doc, &ROOT, 0) {
     //     Ok(data) => Ok(data),
     //     Err(e) => {
