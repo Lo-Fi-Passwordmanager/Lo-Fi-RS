@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use automorph::automerge::ObjId;
 use automorph::crdt::Text;
 use automorph::Automorph;
@@ -16,6 +17,22 @@ pub type AutomergeItems = Vec<AutomergeItem>;
 pub enum AutomergeItem {
     WEntry(AutomergeEntry),
     WFolder(AutomergeFolder),
+}
+
+impl AutomergeItem {
+    pub fn id(&self) -> ObjId {
+        match self {
+            AutomergeItem::WEntry(item) => item.id.clone(),
+            AutomergeItem::WFolder(folder) => folder.id.clone()
+        }
+    }
+
+    pub fn parent_id(&self) -> String {
+        match self {
+            AutomergeItem::WEntry(item) => item.parent_id.to_string(),
+            AutomergeItem::WFolder(folder) => folder.parent_id.to_string()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Automorph, PartialEq)]

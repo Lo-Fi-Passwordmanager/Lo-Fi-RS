@@ -25,7 +25,9 @@ pub enum LoFiError {
     #[error("Something went wrong while encrypting an item: {0}")]
     CouldNotEncrypt(String),
     #[error("Something went wrong while parsing a hex string to bytes: {0}")]
-    CouldNotParse(#[from] ParseIntError),
+    CouldNotParseHex(#[from] ParseIntError),
+    #[error("Something went wrong while parsing the document: {0}")]
+    CouldNotParseDocument(String),
     #[error("Hex strings can may only have an even number of characters.")]
     InvalidLength,
     #[error(

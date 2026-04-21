@@ -297,6 +297,7 @@ impl automorph::Automorph for Doc {
                     .map_err(|e| e.with_field("validation"))?,
                 items: automorph::Automorph::load(doc, &map_id, "items")
                     .map_err(|e| e.with_field("items"))?,
+                au
             }),
             Some((v, _)) => Err(automorph::Error::type_mismatch(
                 "Doc",

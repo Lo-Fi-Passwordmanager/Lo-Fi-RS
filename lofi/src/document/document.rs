@@ -1,9 +1,12 @@
+use std::cell::{RefCell, RefMut};
+use std::collections::HashMap;
+use std::rc::Rc;
+use tracing::debug;
 use crate::document::automerge_document::{
     AutomergeDoc, AutomergeEntry, AutomergeFolder, AutomergeItem,
 };
 use crate::security::crypter::Crypter;
-use crate::LofiResult;
-
+use crate::{LoFiError, LofiResult};
 // TODO Impl from und Into für AutomergeDoc und items, ...
 
 trait FromAutomerge<From, Into> {
@@ -17,90 +20,141 @@ trait ItemAttr {
     fn edited_at(&self) -> f64;
 }
 
+trait FolderFunc {
+    fn insert(&mut self, item: Rc<RefCell<Item>>) -> ();
+    fn items(&self) -> &[Rc<RefCell<Item>>];
+    fn get_item_by_id(&self, id: &str) -> Option<Rc<RefCell<Item>>>;
+}
+
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
-struct LofiDocument {
-    items: Vec<Item>,
+struct LofiDocument(Folder);
+
+impl FolderFunc for LofiDocument {
+    fn insert(&mut self, item: Rc<RefCell<Item>>) -> () {
+        self.0.items.push(item);
+    }
+
+    fn items(&self) -> &[Rc<RefCell<Item>>] {
+        &self.0.items
+    }
+
+    fn get_item_by_id(&self, id: &str) -> Option<Rc<RefCell<Item>>> {
+        self.0.items.iter().find(|item| {
+            item.borrow().id() == id
+        }).cloned()
+    }
+}
+
+impl LofiDocument {
+    fn new() -> Self {
+        LofiDocument(Folder{
+            title: "".to_string(),
+            id: "".to_string(),
+            created_at: 0.0,
+            edited_at: 0.0,
+            items: Vec::new(),
+        })
+    }
+    
+    fn folder(&self) -> Folder {
+        self.0
+    }
 }
 
 impl FromAutomerge<AutomergeDoc, Self> for LofiDocument {
     fn from_automerge(value: &AutomergeDoc, crypter: &Crypter) -> LofiResult<Self> {
-        let items: LofiResult<Vec<Item>> = value
-            .items
-            .iter()
-            .map(|item| Item::from_automerge(item, crypter))
-            .collect();
 
-        Ok(LofiDocument { items: items? })
+        let mut base: LofiDocument = LofiDocument::new();
+
+        let mut automerge_items_by_id: HashMap<String, AutomergeItem> = HashMap::new();
+
+        for item in &value.items {
+            automerge_items_by_id.insert(item.id().to_string(), (*item).clone());
+        }
+
+        let mut path_length_by_item: Vec<(&AutomergeItem, u32)> = Vec::new();
+
+        for item in &value.items {
+            path_length_by_item.push((item, path_length(item, &automerge_items_by_id)));
+        }
+
+        // Nach pfadlänge sortieren, damit auf jeden fall immer die eltern zuerst eingesetzt werden
+        path_length_by_item.sort_by(|a, b| {
+            a.1.cmp(&b.1)
+        });
+
+        let mut items_by_id: HashMap<String, Rc<RefCell<Item>>> = HashMap::new();
+
+        for (item, path) in path_length_by_item {
+            if item.parent_id() == "" {
+                items_by_id.insert(item.id().to_string(), Rc::from(RefCell::from(Item::from_automerge(item, crypter)?)));
+            } else {
+                let parent = items_by_id.get_mut(&item.parent_id());
+                let i = Item::from_automerge(item, crypter)?;
+                match parent {
+                    None => Err(LoFiError::CouldNotParseDocument(format!("Child with ID {} does not exist on Element with ID {}.", &item.parent_id(), item.id())))?,
+                    Some(p) => match *p.borrow_mut() {
+                        Item::Folder(mut folder) => folder.insert(Rc::from(RefCell::from(i))),
+                        Item::Entry(_) => Err(LoFiError::CouldNotParseDocument("Cannot insert value into Entry.".to_string()))?
+                    },
+                }
+                items_by_id.insert((&i).id().to_string(), Rc::from(RefCell::from(i));)
+            }
+        }
+
+        for (_, value) in items_by_id {
+            base.insert(value);
+        }
+
+        Ok(base)
     }
 }
 
-//     const root = new DatabaseRoot(automergeDoc.salt);
-//
-//     const itemsById = new Map<string, AutomergeItem>();
-//     // Die items in eine map packen, wo sie schnell nach id erreichbar sind
-//     for (const item of automergeDoc.items) {
-//         const id = getObjectId(item)!;
-//         itemsById.set(id, item);
-//     }
-//
-//     const pathByItem = new Map<AutomergeItem, Array<string>>();
-//     // Eine map aufbauen, in der zu jedem item der pfad steht (pfad so wie vorher, also array an ids)
-//     for (const item of automergeDoc.items) {
-//         const path = buildPath(item, itemsById);
-//         pathByItem.set(item, path);
-//     }
-//
-//     // Nach pfadlänge sortieren, damit auf jeden fall immer die eltern zuerst eingesetzt werden
-//     const sortedByPathLength = new Map([...pathByItem.entries()].sort((a, b) => a[1].length - b[1].length));
-//
-//     // Der pfadlänge nach in den passwordmanagerroot einsetzen
-//     for (const [item, path] of sortedByPathLength) {
-//         insertNestedValue(root, path, databaseItemFromAutomergeItem(item, securityProvider)); // gleiche fkt wie früher
-//     }
-//
-//     return [root, itemsById];
-// }
-//
-//function insertNestedValue(databaseRoot: DatabaseRoot, path: string[], insert: Item) {
-//     const value = findNestedValue(databaseRoot, path);
-//     if (!value.isFolder()) {
-//         throw Error("Cannot insert value into Entry.");
-//     }
-//     (value as Folder).addItem(insert);
-// }
-//
-//function findNestedValue(databaseRoot: DatabaseRoot, path: string[]): Item {
-//     if (path.length === 0) {
-//         return databaseRoot.rootFolder;
-//     }
-//
-//     let currentValue: Item | null = databaseRoot.rootFolder.getChildById(path[0]);
-//
-//     if (currentValue === null) {
-//         throw Error(`Child with ID ${path[0]} does not exist on DatabaseRoot.`);
-//     }
-//
-//     path.slice(1).forEach((id) => {
-//         if (currentValue!.isFolder()) {
-//             const nestedValue = (currentValue! as Folder).getChildById(id);
-//
-//             if (nestedValue === null) {
-//                 throw Error(`Child with ID ${id} does not exist on Element with ID ${currentValue!.id}.`);
-//             }
-//
-//             currentValue = nestedValue;
-//         } else {
-//             throw Error("Cannot index into Entry because it has no children");
-//         }
-//     });
-//
-//     return currentValue;
-// }
+fn find_and_insert(root: &Rc<RefCell<Item>>, target_id: &str, new_node: Rc<RefCell<Item>>) -> bool {
+    let mut node = root.borrow_mut();
+
+    // If this is the node we are looking for, push the child
+    if &node.id() == target_id {
+        match *node {
+            Item::Entry(_) => {},
+            Item::Folder(mut n) => {
+                n.items.push(new_node);
+            }
+        }
+
+        return true;
+    }
+
+    match *node {
+        Item::Entry(_) => {},
+        Item::Folder(mut n) => {
+            for child in &n.items {
+                if find_and_insert(child, target_id, new_node.clone()) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Otherwise, check all children recursively
+
+
+    false
+}
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum Item {
     Folder(Folder),
     Entry(Entry),
+}
+
+impl Item {
+    pub fn id(&self) -> String {
+        match self {
+            Item::Folder(entry) => entry.id.clone(),
+            Item::Entry(folder) => folder.id.clone()
+        }
+    }
 }
 
 impl FromAutomerge<AutomergeItem, Self> for Item {
@@ -120,7 +174,7 @@ pub struct Folder {
     id: String,
     created_at: f64,
     edited_at: f64,
-    items: Vec<Item>,
+    items: Vec<Rc<RefCell<Item>>>,
 }
 
 impl ItemAttr for Folder {
@@ -138,6 +192,22 @@ impl ItemAttr for Folder {
 
     fn edited_at(&self) -> f64 {
         self.edited_at
+    }
+}
+
+impl FolderFunc for Folder {
+    fn insert(&mut self, item: Rc<RefCell<Item>>) -> () {
+        self.items.push(item);
+    }
+
+    fn items(&self) -> &[Rc<RefCell<Item>>] {
+        &self.items
+    }
+
+    fn get_item_by_id(&self, id: &str) -> Option<Rc<RefCell<Item>>> {
+        self.items.iter().find(|item| {
+            item.borrow().id() == id
+        }).cloned()
     }
 }
 
@@ -201,5 +271,23 @@ impl Entry {
     }
     fn note(&self) -> String {
         self.note.clone()
+    }
+}
+
+fn path_length(item: &AutomergeItem, items_by_id: &HashMap<String, AutomergeItem>) -> u32 {
+    if item.parent_id().is_empty() {
+        return 0;
+    }
+
+    let parent = items_by_id.get(&item.parent_id());
+
+    match parent {
+        None => {
+            debug!("Found item with invalid parent id, treating as empty parent id.");
+            0
+        }
+        Some(parent) => {
+            path_length(parent, items_by_id) + 1
+        }
     }
 }

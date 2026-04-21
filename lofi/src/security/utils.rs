@@ -9,7 +9,7 @@ pub fn hex_to_bytes(s: &str) -> Result<Vec<u8>, LoFiError> {
         let mut bytes: Vec<u8> = Vec::new();
 
         for byte in hey_bytes {
-            bytes.push(u8::from_str_radix(byte, 16).map_err(LoFiError::CouldNotParse)?)
+            bytes.push(u8::from_str_radix(byte, 16).map_err(LoFiError::CouldNotParseHex)?)
         }
         Ok(bytes)
     }
