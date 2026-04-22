@@ -1,7 +1,7 @@
 use crate::LoFiError;
 
 pub fn hex_to_bytes(s: &str) -> Result<Vec<u8>, LoFiError> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         Err(LoFiError::InvalidLength)
     } else {
         let hey_bytes: Vec<&str> = (0..s.len()).step_by(2).map(|i| &s[i..i + 2]).collect();

@@ -30,7 +30,7 @@ pub trait FolderFunc {
 pub struct LofiDocument(Folder);
 
 impl FolderFunc for LofiDocument {
-    fn insert(&mut self, item: Item) -> () {
+    fn insert(&mut self, item: Item) {
         self.0.items.push(item);
     }
 
@@ -177,7 +177,7 @@ impl ItemAttr for Folder {
 }
 
 impl FolderFunc for Folder {
-    fn insert(&mut self, item: Item) -> () {
+    fn insert(&mut self, item: Item) {
         self.items.push(item);
     }
 

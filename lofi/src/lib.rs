@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::document::automerge_document::{AutomergeDoc, AutomergeItems, DocUpdate};
 use anyhow::Result;
 use automerge::{Automerge, PatchAction};
@@ -10,7 +11,7 @@ use std::num::ParseIntError;
 use thiserror::Error;
 use tokio::task::JoinHandle;
 use tracing::{debug, error};
-use crate::document::document::{FromAutomerge, LofiDocument};
+use crate::document::lofi_document::{FromAutomerge, LofiDocument};
 use crate::security::crypter::Crypter;
 
 pub mod document;
@@ -72,7 +73,7 @@ pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
 pub async fn open_document(
     repo: Repo,
     doc_id: DocumentId,
-    _change_handler: Option<&dyn Fn(Vec<DocUpdate>) -> ()>,
+    _change_handler: Option<&dyn Fn(Vec<DocUpdate>)>,
 ) -> Result<(DocHandle, JoinHandle<()>)> {
     debug!("Looking for document...");
     let doc_handle = repo.find(doc_id.clone()).await?;
@@ -94,9 +95,9 @@ pub async fn open_document(
                 let mut current_heads = change_handle.with_document(|d| d.get_heads());
                 while let Some(change) = change_stream_rx.next().await {
                     let patches = change_handle
-                        .with_document(|d| d.diff(&*current_heads, &*change.new_heads));
+                        .with_document(|d| d.diff(&current_heads, &change.new_heads));
 
-                    let changes: Vec<DocUpdate> = Vec::new();
+                    let _changes: Vec<DocUpdate> = Vec::new();
 
                     // Hier prob. nur noch einmal data.update aufrufen und die changes bekommen
 
@@ -146,7 +147,7 @@ pub async fn get_doc_data(doc_handle: DocHandle, password: &str) -> LofiResult<L
         items,
     };
 
-    let crypter = Crypter::from_doc(&doc_data, "1")?;
+    let crypter = Crypter::from_doc(&doc_data, password)?;
 
     LofiDocument::from_automerge(&doc_data, &crypter)
 }

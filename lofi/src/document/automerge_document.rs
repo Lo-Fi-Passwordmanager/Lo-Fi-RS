@@ -1,4 +1,3 @@
-use std::hash::{Hash, Hasher};
 use automorph::automerge::ObjId;
 use automorph::crdt::Text;
 use automorph::Automorph;
@@ -67,10 +66,10 @@ pub struct AutomergeFolder {
 
 pub struct DocUpdate {
     obj_id: ObjId,
-    update: Update,
+    update: Change,
 }
 
-pub enum Update {
+pub enum Change {
     UpdateMapElement,
     DeleteMapElement,
     UpdateArrayElement,

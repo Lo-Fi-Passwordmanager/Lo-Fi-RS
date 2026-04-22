@@ -43,9 +43,9 @@ impl Crypter {
             .decrypt(nonce, hex_to_bytes(ciphertext)?.as_ref())
             .map_err(|_| LoFiError::CouldNotDecrypt("Unable to decrypt string.".to_string()))?;
         tracing::debug!("Decrypted.");
-        Ok(String::from_utf8(decrypted).map_err(|_| {
+        String::from_utf8(decrypted).map_err(|_| {
             LoFiError::CouldNotDecrypt("Decrypted value is not a valid utf-8 string.".to_string())
-        })?)
+        })
     }
 
     pub fn encrypt(&self, plaintext: &str) -> LofiResult<String> {

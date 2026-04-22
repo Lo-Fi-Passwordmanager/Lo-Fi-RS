@@ -21,7 +21,7 @@ pub(super) fn derive_key(password: &str, salt: &str) -> Result<[u8; 32], LoFiErr
 
     scrypt(
         password.as_bytes(),
-        &*salt_bytes,
+        &salt_bytes,
         &<Scrypt as PasswordHasher>::Params::new(18, 8, 1, 32)
             .map_err(|_| LoFiError::InvalidScryptParams)?,
         &mut key,

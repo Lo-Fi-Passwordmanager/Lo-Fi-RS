@@ -1,8 +1,7 @@
-use std::ops::Deref;
 use anyhow::Result;
 use lofi::{connect, get_doc_data, open_document};
 use samod::{DocumentId, Url};
-use lofi::document::document::{FolderFunc, Item, ItemAttr};
+use lofi::document::lofi_document::{FolderFunc, Item, ItemAttr};
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -17,18 +16,18 @@ pub async fn main() -> Result<()> {
         .init();
 
     let url = Url::parse(
-        &"wss://5bcaaf94-60ef-4757-b55c-5f2e443c480c.ka.bw-cloud-instance.org:443".to_string(),
+        "wss://5bcaaf94-60ef-4757-b55c-5f2e443c480c.ka.bw-cloud-instance.org:443",
     )
     .expect("valid WebSocket listener URL for samod");
     let doc_id: DocumentId = "3J14FKnxJStfFycHKszg2xdv5hRy".parse()?;
 
-    let (repo, dialer_handle) = connect(url).await?;
+    let (repo, _dialer_handle) = connect(url).await?;
 
     let (doc_handle, am_changes_handle) = open_document(repo, doc_id, None).await?;
 
     let doc_data = get_doc_data(doc_handle, "1").await?;
 
-    if doc_data.items().len() == 0 {
+    if doc_data.items().is_empty() {
         println!("This document has no items.");
         // return Ok(());
     }
