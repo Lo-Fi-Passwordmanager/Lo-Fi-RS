@@ -118,8 +118,8 @@ dependencies = [
 
 [[package]]
 name = "automorph"
-version = "0.2.1"
-source = "git+https://codeberg.org/RedCommander735/automorph.git#9dd30b61ef1688aa6ddd93ebad29c6c5deb12ed6"
+version = "0.2.0"
+source = "git+https://codeberg.org/dpp/automorph.git#f64f006f1b93a993d59e7917e9a9d0b4584ab719"
 dependencies = [
  "anyhow",
  "automerge",
@@ -130,8 +130,8 @@ dependencies = [
 
 [[package]]
 name = "automorph-derive"
-version = "0.2.1"
-source = "git+https://codeberg.org/RedCommander735/automorph.git#9dd30b61ef1688aa6ddd93ebad29c6c5deb12ed6"
+version = "0.2.0"
+source = "git+https://codeberg.org/dpp/automorph.git#f64f006f1b93a993d59e7917e9a9d0b4584ab719"
 dependencies = [
  "automerge",
  "proc-macro2",
