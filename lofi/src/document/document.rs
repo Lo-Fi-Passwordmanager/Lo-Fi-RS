@@ -1,63 +1,74 @@
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell};
 use std::collections::HashMap;
+use std::ops::{DerefMut};
 use std::rc::Rc;
 use tracing::debug;
 use crate::document::automerge_document::{
     AutomergeDoc, AutomergeEntry, AutomergeFolder, AutomergeItem,
 };
 use crate::security::crypter::Crypter;
-use crate::{LoFiError, LofiResult};
+use crate::{LofiResult};
 // TODO Impl from und Into für AutomergeDoc und items, ...
 
-trait FromAutomerge<From, Into> {
+pub(crate) trait FromAutomerge<From, Into> {
     fn from_automerge(value: &From, crypter: &Crypter) -> LofiResult<Into>;
 }
 
-trait ItemAttr {
+pub trait ItemAttr {
     fn title(&self) -> String;
     fn id(&self) -> String;
     fn created_at(&self) -> f64;
     fn edited_at(&self) -> f64;
 }
 
-trait FolderFunc {
+// TODO Split trait in public (items, getbyid) and non public (insert)
+pub trait FolderFunc {
     fn insert(&mut self, item: Rc<RefCell<Item>>) -> ();
-    fn items(&self) -> &[Rc<RefCell<Item>>];
-    fn get_item_by_id(&self, id: &str) -> Option<Rc<RefCell<Item>>>;
+    fn items(&self) -> Vec<Item>;
+    fn get_item_by_id(&self, id: &str) -> Option<Item>;
 }
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
-struct LofiDocument(Folder);
+pub struct LofiDocument(Rc<RefCell<Folder>>);
 
 impl FolderFunc for LofiDocument {
     fn insert(&mut self, item: Rc<RefCell<Item>>) -> () {
-        self.0.items.push(item);
+        self.0.borrow_mut().items.push(item);
     }
 
-    fn items(&self) -> &[Rc<RefCell<Item>>] {
-        &self.0.items
+    fn items(&self) -> Vec<Item> {
+        let items: Vec<Item> = self.0.borrow().items().iter()
+            .map(|rc| {
+                // 1. .borrow() gives a Ref<Item>
+                // 2. .clone() creates a new Item instance
+                rc.borrow().clone()
+            })
+            .collect();
+        items
     }
 
-    fn get_item_by_id(&self, id: &str) -> Option<Rc<RefCell<Item>>> {
-        self.0.items.iter().find(|item| {
+    fn get_item_by_id(&self, id: &str) -> Option<Item> {
+        self.0.borrow().items.iter().find(|item| {
             item.borrow().id() == id
-        }).cloned()
+        }).cloned().map(|rc| {
+            rc.borrow().clone()
+        })
     }
 }
 
 impl LofiDocument {
     fn new() -> Self {
-        LofiDocument(Folder{
+        LofiDocument(Rc::from(RefCell::from(Folder{
             title: "".to_string(),
             id: "".to_string(),
             created_at: 0.0,
             edited_at: 0.0,
             items: Vec::new(),
-        })
+        })))
     }
-    
-    fn folder(&self) -> Folder {
-        self.0
+
+    fn folder(&self) -> Rc<RefCell<Folder>> {
+        self.0.clone()
     }
 }
 
@@ -72,87 +83,71 @@ impl FromAutomerge<AutomergeDoc, Self> for LofiDocument {
             automerge_items_by_id.insert(item.id().to_string(), (*item).clone());
         }
 
-        let mut path_length_by_item: Vec<(&AutomergeItem, u32)> = Vec::new();
+        let mut path_by_item: Vec<(&AutomergeItem, u32, Vec<String>)> = Vec::new();
 
         for item in &value.items {
-            path_length_by_item.push((item, path_length(item, &automerge_items_by_id)));
+            let (len, path) = path(item, &automerge_items_by_id);
+            path_by_item.push((item, len, path));
         }
 
         // Nach pfadlänge sortieren, damit auf jeden fall immer die eltern zuerst eingesetzt werden
-        path_length_by_item.sort_by(|a, b| {
+        path_by_item.sort_by(|a, b| {
             a.1.cmp(&b.1)
         });
 
-        let mut items_by_id: HashMap<String, Rc<RefCell<Item>>> = HashMap::new();
-
-        for (item, path) in path_length_by_item {
-            if item.parent_id() == "" {
-                items_by_id.insert(item.id().to_string(), Rc::from(RefCell::from(Item::from_automerge(item, crypter)?)));
+        for (item, len, path) in path_by_item {
+            if len == 0 {
+                base.insert(Rc::from(RefCell::from(Item::from_automerge(item, crypter)?)))
             } else {
-                let parent = items_by_id.get_mut(&item.parent_id());
                 let i = Item::from_automerge(item, crypter)?;
-                match parent {
-                    None => Err(LoFiError::CouldNotParseDocument(format!("Child with ID {} does not exist on Element with ID {}.", &item.parent_id(), item.id())))?,
-                    Some(p) => match *p.borrow_mut() {
-                        Item::Folder(mut folder) => folder.insert(Rc::from(RefCell::from(i))),
-                        Item::Entry(_) => Err(LoFiError::CouldNotParseDocument("Cannot insert value into Entry.".to_string()))?
-                    },
-                }
-                items_by_id.insert((&i).id().to_string(), Rc::from(RefCell::from(i));)
+                find_and_insert(&Rc::from(RefCell::from(Item::Folder(base.folder()))), &path, Rc::new(RefCell::new(i)));
             }
         }
 
-        for (_, value) in items_by_id {
-            base.insert(value);
-        }
 
         Ok(base)
     }
 }
 
-fn find_and_insert(root: &Rc<RefCell<Item>>, target_id: &str, new_node: Rc<RefCell<Item>>) -> bool {
+fn find_and_insert(root: &Rc<RefCell<Item>>, path: &[String], new_node: Rc<RefCell<Item>>) -> bool {
     let mut node = root.borrow_mut();
 
     // If this is the node we are looking for, push the child
-    if &node.id() == target_id {
-        match *node {
+    if path.len() == 1 && node.id() == path[0] {
+        match node.deref_mut() {
             Item::Entry(_) => {},
-            Item::Folder(mut n) => {
-                n.items.push(new_node);
+            Item::Folder(n) => {
+                n.clone().borrow_mut().items.push(new_node);
             }
         }
 
         return true;
     }
 
-    match *node {
+    match node.deref_mut() {
         Item::Entry(_) => {},
-        Item::Folder(mut n) => {
-            for child in &n.items {
-                if find_and_insert(child, target_id, new_node.clone()) {
+        Item::Folder(n) => {
+            for child in &n.clone().borrow_mut().items {
+                if find_and_insert(child, &path[1..], new_node.clone()) {
                     return true;
                 }
             }
         }
     }
-
-    // Otherwise, check all children recursively
-
-
     false
 }
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum Item {
-    Folder(Folder),
-    Entry(Entry),
+    Folder(Rc<RefCell<Folder>>),
+    Entry(Rc<RefCell<Entry>>),
 }
 
 impl Item {
     pub fn id(&self) -> String {
         match self {
-            Item::Folder(entry) => entry.id.clone(),
-            Item::Entry(folder) => folder.id.clone()
+            Item::Folder(entry) => entry.borrow().id.clone(),
+            Item::Entry(folder) => folder.borrow().id.clone()
         }
     }
 }
@@ -160,9 +155,9 @@ impl Item {
 impl FromAutomerge<AutomergeItem, Self> for Item {
     fn from_automerge(value: &AutomergeItem, crypter: &Crypter) -> LofiResult<Self> {
         match value {
-            AutomergeItem::WEntry(inner) => Ok(Item::Entry(Entry::from_automerge(inner, crypter)?)),
+            AutomergeItem::WEntry(inner) => Ok(Item::Entry(Rc::from(RefCell::from(Entry::from_automerge(inner, crypter)?)))),
             AutomergeItem::WFolder(inner) => {
-                Ok(Item::Folder(Folder::from_automerge(inner, crypter)?))
+                Ok(Item::Folder(Rc::from(RefCell::from(Folder::from_automerge(inner, crypter)?))))
             }
         }
     }
@@ -200,25 +195,38 @@ impl FolderFunc for Folder {
         self.items.push(item);
     }
 
-    fn items(&self) -> &[Rc<RefCell<Item>>] {
-        &self.items
+    fn items(&self) -> Vec<Item> {
+        let items: Vec<Item> = self.items.iter()
+            .map(|rc| {
+                rc.borrow().clone()
+            })
+            .collect();
+        items
     }
 
-    fn get_item_by_id(&self, id: &str) -> Option<Rc<RefCell<Item>>> {
+    fn get_item_by_id(&self, id: &str) -> Option<Item> {
         self.items.iter().find(|item| {
             item.borrow().id() == id
-        }).cloned()
+        }).cloned().map(|rc| {
+            rc.borrow().clone()
+        })
     }
 }
 
 impl FromAutomerge<AutomergeFolder, Self> for Folder {
     fn from_automerge(value: &AutomergeFolder, crypter: &Crypter) -> LofiResult<Self> {
-        todo!()
+        Ok(Self {
+            title: crypter.decrypt(&value.name)?,
+            id: value.id.to_string(),
+            created_at: value.created_at,
+            edited_at: value.edited_at,
+            items: Vec::new()
+        })
     }
 }
 
 impl Folder {
-    fn items(&self) -> Vec<Item> {
+    fn items(&self) -> Vec<Rc<RefCell<Item>>> {
         self.items.clone()
     }
 }
@@ -255,7 +263,16 @@ impl ItemAttr for Entry {
 
 impl FromAutomerge<AutomergeEntry, Self> for Entry {
     fn from_automerge(value: &AutomergeEntry, crypter: &Crypter) -> LofiResult<Self> {
-        todo!()
+        Ok(Self {
+            title: crypter.decrypt(&value.name)?,
+            id: value.id.to_string(),
+            created_at: value.created_at,
+            edited_at: value.edited_at,
+            username: crypter.decrypt(&value.username)?,
+            password: crypter.decrypt(&value.password)?,
+            url: crypter.decrypt(&value.url)?,
+            note: crypter.decrypt(&value.note)?,
+        })
     }
 }
 
@@ -274,9 +291,9 @@ impl Entry {
     }
 }
 
-fn path_length(item: &AutomergeItem, items_by_id: &HashMap<String, AutomergeItem>) -> u32 {
+fn path(item: &AutomergeItem, items_by_id: &HashMap<String, AutomergeItem>) -> (u32, Vec<String>) {
     if item.parent_id().is_empty() {
-        return 0;
+        return (0, Vec::new());
     }
 
     let parent = items_by_id.get(&item.parent_id());
@@ -284,10 +301,12 @@ fn path_length(item: &AutomergeItem, items_by_id: &HashMap<String, AutomergeItem
     match parent {
         None => {
             debug!("Found item with invalid parent id, treating as empty parent id.");
-            0
+            (0, Vec::new())
         }
         Some(parent) => {
-            path_length(parent, items_by_id) + 1
+            let (len, mut p) = path(parent, items_by_id);
+            p.push(item.parent_id());
+            (len + 1, p)
         }
     }
 }

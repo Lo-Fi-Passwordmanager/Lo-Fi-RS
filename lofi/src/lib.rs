@@ -10,6 +10,8 @@ use std::num::ParseIntError;
 use thiserror::Error;
 use tokio::task::JoinHandle;
 use tracing::{debug, error};
+use crate::document::document::{FromAutomerge, LofiDocument};
+use crate::security::crypter::Crypter;
 
 pub mod document;
 pub(crate) mod security;
@@ -34,6 +36,10 @@ pub enum LoFiError {
         "Invalid Scrypt parameter. This should not happen, these are hardcoded, wtf did you do."
     )]
     InvalidScryptParams,
+    #[error(
+        "Something went wrong with automerge: {0}"
+    )]
+    AutomorphError(#[from] automorph::Error),
 }
 
 pub async fn connect(websocket_url: Url) -> Result<(Repo, DialerHandle)> {
@@ -119,7 +125,7 @@ pub async fn open_document(
     }
 }
 
-pub async fn get_doc_data(doc_handle: DocHandle) -> Result<AutomergeDoc> {
+pub async fn get_doc_data(doc_handle: DocHandle, password: &str) -> LofiResult<LofiDocument> {
     // doc_handle.with_document(|doc| match Doc::load(doc, &ROOT, 0) {
     //     Ok(data) => Ok(data),
     //     Err(e) => {
@@ -133,9 +139,14 @@ pub async fn get_doc_data(doc_handle: DocHandle) -> Result<AutomergeDoc> {
     let items = doc_handle
         .with_document(|doc: &mut Automerge| AutomergeItems::load(doc, &ROOT, "items"))?;
 
-    Ok(AutomergeDoc {
+
+    let doc_data = AutomergeDoc {
         salt,
         validation,
         items,
-    })
+    };
+
+    let crypter = Crypter::from_doc(&doc_data, "1")?;
+
+    LofiDocument::from_automerge(&doc_data, &crypter)
 }

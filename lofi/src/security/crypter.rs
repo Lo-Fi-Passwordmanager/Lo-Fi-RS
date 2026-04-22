@@ -1,7 +1,7 @@
 use crate::document::automerge_document::AutomergeDoc;
 use crate::security::keygen::{derive_key, generate_nonce};
 use crate::security::utils::{bytes_to_hex, hex_to_bytes};
-use crate::LoFiError;
+use crate::{LoFiError, LofiResult};
 use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, KeyInit, Nonce};
 
@@ -13,17 +13,17 @@ pub struct Crypter {
 }
 
 impl Crypter {
-    pub fn from_doc(doc: &AutomergeDoc, password: &str) -> Result<Self, LoFiError> {
+    pub fn from_doc(doc: &AutomergeDoc, password: &str) -> LofiResult<Self> {
         let key = derive_key(password, &doc.salt)?;
         let _ = Self::_decrypt(&key, &doc.validation).map_err(|_| LoFiError::InvalidPassword)?;
         Ok(Self { key })
     }
 
-    pub fn decrypt(&self, encrypted: &str) -> Result<String, LoFiError> {
+    pub fn decrypt(&self, encrypted: &str) -> LofiResult<String> {
         Self::_decrypt(&self.key, encrypted)
     }
 
-    fn _decrypt(key: &[u8; 32], encrypted: &str) -> Result<String, LoFiError> {
+    fn _decrypt(key: &[u8; 32], encrypted: &str) -> LofiResult<String> {
         tracing::debug!("Decrypting item...");
         let enc: Vec<&str> = encrypted.split(SEPARATOR).collect();
 
@@ -48,7 +48,7 @@ impl Crypter {
         })?)
     }
 
-    pub fn encrypt(&self, plaintext: &str) -> Result<String, LoFiError> {
+    pub fn encrypt(&self, plaintext: &str) -> LofiResult<String> {
         let nonce = generate_nonce();
         let cipher = Aes256GcmSiv::new_from_slice(&self.key)
             .map_err(|_| LoFiError::CouldNotEncrypt("Derived key was to long.".to_string()))?;

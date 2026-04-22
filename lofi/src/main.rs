@@ -1,7 +1,8 @@
+use std::ops::Deref;
 use anyhow::Result;
-use lofi::document::automerge_document::AutomergeItem;
 use lofi::{connect, get_doc_data, open_document};
 use samod::{DocumentId, Url};
+use lofi::document::document::{FolderFunc, Item, ItemAttr};
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -25,22 +26,28 @@ pub async fn main() -> Result<()> {
 
     let (doc_handle, am_changes_handle) = open_document(repo, doc_id, None).await?;
 
-    let doc_data = get_doc_data(doc_handle).await?;
+    let doc_data = get_doc_data(doc_handle, "1").await?;
 
-    if doc_data.items.len() == 0 {
+    if doc_data.items().len() == 0 {
         println!("This document has no items.");
         // return Ok(());
     }
 
-    // let crypter = Crypter::from_doc(&doc_data, "1")?;
+    // let crypter = ?;
 
-    for item in &doc_data.items {
+    for item in &doc_data.items() {
         match item {
-            AutomergeItem::WEntry(entry) => {
-                println!("Entry: {:?}", &entry.id.to_string());
+            // AutomergeItem::WEntry(entry) => {
+            //     println!("Entry: {:?}", &entry.id.to_string());
+            // }
+            // AutomergeItem::WFolder(folder) => {
+            //     println!("Folder: {:?}", &folder.id.to_string());
+            // }
+            Item::Entry(entry) => {
+                println!("Entry: {:?}", &entry.borrow().title());
             }
-            AutomergeItem::WFolder(folder) => {
-                println!("Folder: {:?}", &folder.id.to_string());
+            Item::Folder(folder) => {
+                println!("Folder: {:?}", &folder.borrow().title());
             }
         }
     }
